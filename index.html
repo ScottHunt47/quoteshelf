@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Quote Shelf</title>
+<meta name="description" content="Save and revisit quotes from the books you read.">
+<meta name="theme-color" content="#1f5f74">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Quotes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/favicon.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a reading app. Library shelf of generated covers -> book page with its highlights; add flows open as a bottom sheet. */
+:root{
+  --bg:#f3f5f4; --surface:#ffffff; --ink:#18232b; --muted:#5d6b73; --line:#d9e0df;
+  --accent:#1f5f74; --accent-ink:#ffffff; --mark:#ffe66b; --mark-ink:#18232b; --danger:#b3261e;
+  --c1:#2f5d62; --c2:#7a4a2b; --c3:#3d4f7c; --c4:#6b3f5c; --c5:#4f6a3a; --c6:#8a5a18; --c7:#29464f; --c8:#5a3a3a;
+  --serif:"Literata",Georgia,"Times New Roman",serif;
+  --sans:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --r:10px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#11181d; --surface:#18222a; --ink:#e7ecee; --muted:#9aa8b0; --line:#2a3842;
+  --accent:#7cc4d8; --accent-ink:#0d1a20; --mark:#5b5121; --mark-ink:#fbf3c4; --danger:#ff8a80; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#11181d; --surface:#18222a; --ink:#e7ecee; --muted:#9aa8b0; --line:#2a3842;
+  --accent:#7cc4d8; --accent-ink:#0d1a20; --mark:#5b5121; --mark-ink:#fbf3c4; --danger:#ff8a80; color-scheme:dark}
+
+*{box-sizing:border-box}
+html,body{min-height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:10}
+.wrap{max-width:860px;margin:0 auto;padding-block:20px 80px}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{margin:0;text-wrap:balance}
+
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;align-items:center;gap:12px;padding-block:10px;border-bottom:1px solid var(--line)}
+.brand{font-family:var(--serif);font-weight:600;font-size:1.35rem;letter-spacing:-.01em;display:flex;align-items:center;gap:8px;background:none;border:0;padding:0}
+.brand i{display:inline-block;width:14px;height:18px;background:var(--mark);border-radius:2px;transform:skewX(-8deg)}
+.top .grow{flex:1}
+.status{font-size:.78rem;color:var(--muted)}
+
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 14px;font-weight:600;font-size:.9rem;display:inline-flex;align-items:center;gap:6px}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.ghost{background:none;border-color:transparent;color:var(--muted)}
+.btn.danger{color:var(--danger)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.sm{padding:5px 10px;font-size:.82rem}
+
+.label{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+
+/* review strip */
+.review{margin-top:24px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px 22px;display:grid;gap:10px}
+.review blockquote{margin:0;font-family:var(--serif);font-size:1.2rem;line-height:1.55}
+.review .meta{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;color:var(--muted);font-size:.88rem}
+
+.search{margin-top:24px;display:flex;gap:10px;flex-wrap:wrap}
+.search input{flex:1;min-width:0;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:10px 16px}
+
+.section-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:28px}
+.section-head h2{font-family:var(--serif);font-size:1.25rem;font-weight:600}
+
+.shelf{margin-top:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:22px 18px}
+.book{background:none;border:0;padding:0;text-align:left;display:grid;gap:8px;min-width:0}
+.cover{aspect-ratio:2/3;max-width:100%;border-radius:3px 7px 7px 3px;padding:14px 12px;color:#f7f3ea;display:flex;flex-direction:column;justify-content:space-between;
+  box-shadow:inset 6px 0 0 rgba(0,0,0,.18),0 1px 2px rgba(0,0,0,.15),0 6px 14px -8px rgba(0,0,0,.4);transition:transform .15s}
+.book:hover .cover{transform:translateY(-3px)}
+.cover .ct{font-family:var(--serif);font-weight:600;font-size:1rem;line-height:1.2;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
+.cover .ca{font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;opacity:.85;overflow-wrap:anywhere}
+.book .count{font-size:.82rem;color:var(--muted)}
+.book .count b{color:var(--ink);font-variant-numeric:tabular-nums}
+
+.empty{margin-top:28px;border:1.5px dashed var(--line);border-radius:var(--r);padding:36px 24px;text-align:center;display:grid;gap:12px;justify-items:center}
+.empty h2{font-family:var(--serif);font-size:1.3rem}
+.empty p{margin:0;color:var(--muted);max-width:42ch}
+
+/* book page */
+.bookhead{margin-top:20px;display:grid;grid-template-columns:110px 1fr;gap:20px;align-items:end}
+.bookhead .cover{width:110px}
+.bookhead h1{font-family:var(--serif);font-size:1.7rem;line-height:1.2;font-weight:600}
+.bookhead .by{color:var(--muted);margin-top:4px}
+.bookhead .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+@media (max-width:460px){.bookhead{grid-template-columns:84px 1fr;gap:14px}.bookhead .cover{width:84px;padding:10px 8px}.bookhead .cover .ct{font-size:.8rem}.bookhead h1{font-size:1.35rem}}
+
+.quotes{margin-top:22px;display:grid;gap:14px}
+.q{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;display:grid;gap:10px;min-width:0}
+.q .text{font-family:var(--serif);font-size:1.08rem;line-height:1.6;margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.q .text span{background:linear-gradient(transparent 12%,var(--mark) 12%,var(--mark) 88%,transparent 88%);color:var(--mark-ink);box-decoration-break:clone;-webkit-box-decoration-break:clone;padding:0 2px}
+.q .note{border-left:2px solid var(--line);padding-left:12px;color:var(--muted);font-size:.92rem;white-space:pre-wrap;overflow-wrap:anywhere}
+.q .foot{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;font-size:.82rem;color:var(--muted)}
+.q .foot .src{flex:1;min-width:0}
+.pg{font-variant-numeric:tabular-nums;border:1px solid var(--line);border-radius:4px;padding:0 6px}
+.confirm{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:.88rem}
+
+/* sheet */
+.scrim{position:fixed;inset:0;background:rgba(10,16,20,.45);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--bg);width:100%;max-width:560px;max-height:92%;overflow:auto;border-radius:16px 16px 0 0;
+  padding:20px max(20px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(20px,env(safe-area-inset-left,0px));display:grid;gap:16px}
+@media (min-width:640px){.scrim{align-items:center}.sheet{border-radius:16px}}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.sheet-head h2{font-family:var(--serif);font-size:1.3rem;font-weight:600}
+.tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px}
+.tabs button{flex:1;border:0;background:none;border-radius:999px;padding:7px 10px;font-weight:600;font-size:.88rem;color:var(--muted)}
+.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+.field{display:grid;gap:6px}
+.field label{font-size:.85rem;font-weight:600}
+.field label em{font-style:normal;font-weight:400;color:var(--muted)}
+.field input,.field textarea{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:10px 12px;width:100%}
+.field textarea{resize:vertical;min-height:80px}
+.field textarea.big{min-height:140px;font-family:var(--serif);font-size:1.02rem}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:420px){.row2{grid-template-columns:1fr}}
+.err{color:var(--danger);font-size:.85rem;margin:0}
+.hint{color:var(--muted);font-size:.82rem;margin:0}
+.results{display:grid;gap:8px}
+.res{display:grid;grid-template-columns:36px 1fr auto;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;text-align:left}
+.res .mini{width:36px;aspect-ratio:2/3;border-radius:2px 4px 4px 2px;box-shadow:inset 3px 0 0 rgba(0,0,0,.2)}
+.res .rt{font-weight:600;overflow-wrap:anywhere}
+.res .ra{color:var(--muted);font-size:.85rem}
+.res:hover{border-color:var(--accent)}
+.linked{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:.9rem}
+.linked b{font-family:var(--serif)}
+.sheet-foot{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:.88rem;z-index:30}
+.loading{margin-top:60px;text-align:center;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* standalone additions */
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+img{max-width:100%}
+.cover{position:relative;overflow:hidden}
+.cover img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.res .mini{position:relative;overflow:hidden}
+.res .mini img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.iconbtn{border:1px solid var(--line);background:var(--surface);border-radius:999px;width:38px;height:38px;display:inline-grid;place-items:center;padding:0}
+.iconbtn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.setting{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;display:grid;gap:10px}
+.setting h3{font-size:1rem}
+.setting p{margin:0;color:var(--muted);font-size:.88rem}
+.setting .btns{display:flex;flex-wrap:wrap;gap:8px}
+.banner{margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:.9rem}
+.banner p{margin:0;flex:1;min-width:200px}
+@media (max-width:420px){#addBookTop .long{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <button class="brand" id="home" type="button"><i aria-hidden="true"></i>Quote Shelf</button>
+    <span class="grow"></span>
+    <button class="iconbtn" id="settingsBtn" type="button" aria-label="Backup and settings">
+      <svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+    </button>
+    <button class="btn primary" id="addBookTop" type="button">+ <span class="long">Add </span>book</button>
+  </header>
+  <main id="app"></main>
+</div>
+<div id="sheetRoot"></div>
+<div id="toastRoot"></div>
+<input type="file" id="importFile" accept="application/json,.json" hidden>
+
+<script>
+(() => {
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const COVERS = ["--c1","--c2","--c3","--c4","--c5","--c6","--c7","--c8"];
+const coverColor = t => { let h = 0; for (const ch of String(t)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return `var(${COVERS[h % COVERS.length]})`; };
+const coverUrl = (id, size = "M") => id ? `https://covers.openlibrary.org/b/id/${encodeURIComponent(id)}-${size}.jpg` : "";
+
+const KEY = "quote-shelf-v1";
+const state = { books: [], quotes: [], view: { name: "library" }, filter: "", lastBackup: 0 };
+
+/* ---------- storage: on this device ---------- */
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY) || "{}");
+    state.books = s.books || []; state.quotes = s.quotes || []; state.lastBackup = s.lastBackup || 0;
+  } catch {}
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify({ books: state.books, quotes: state.quotes, lastBackup: state.lastBackup })); return true; }
+  catch { toast("Couldn't save. Your phone may be out of storage."); return false; }
+}
+function put(kind, obj) {
+  const list = state[kind]; const i = list.findIndex(x => x.id === obj.id);
+  if (i >= 0) list[i] = obj; else list.push(obj);
+  save(); render();
+}
+function del(kind, id) { state[kind] = state[kind].filter(x => x.id !== id); save(); render(); }
+// Ask the browser not to clear our data when space runs low.
+try { navigator.storage?.persist?.(); } catch {}
+
+/* ---------- helpers ---------- */
+const bookOf = id => state.books.find(b => b.id === id);
+const quotesFor = id => state.quotes.filter(q => q.bookId === id).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+function coverHTML(b, cls = "cover", size = "M") {
+  const img = b.coverId ? `<img src="${coverUrl(b.coverId, size)}" alt="" loading="lazy" onerror="this.remove()">` : "";
+  return `<div class="${cls}" style="background:${coverColor(b.title + b.author)}"><div class="ct">${esc(b.title)}</div><div class="ca">${esc(b.author || "Unknown author")}</div>${img}</div>`;
+}
+let toastTimer;
+function toast(msg) { const r = $("#toastRoot"); r.innerHTML = `<div class="toast" role="status">${esc(msg)}</div>`; clearTimeout(toastTimer); toastTimer = setTimeout(() => r.innerHTML = "", 2600); }
+async function copy(text) {
+  try { await navigator.clipboard.writeText(text); toast("Copied"); }
+  catch { toast("Couldn't copy. Select the text to copy it."); }
+}
+function go(view) { state.view = view; render(); window.scrollTo(0, 0); }
+function downloadFile(name, text, type) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = document.createElement("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+}
+const today = () => new Date().toISOString().slice(0, 10);
+
+/* ---------- views ---------- */
+let reviewId = null;
+function render() {
+  const v = state.view;
+  if (v.name === "book" && !bookOf(v.id)) state.view = { name: "library" };
+  state.view.name === "book" ? renderBook(state.view.id) : renderLibrary();
+}
+
+function quoteCard(q, showSource) {
+  const b = bookOf(q.bookId) || { title: q.bookTitle, author: q.author };
+  const confirming = state.confirmQuote === q.id;
+  return `<article class="q" data-q="${q.id}">
+    <p class="text"><span>${esc(q.text)}</span></p>
+    ${q.note ? `<div class="note">${esc(q.note)}</div>` : ""}
+    <div class="foot">
+      <span class="src">${showSource ? `<b>${esc(b.title)}</b> · ${esc(b.author || "")}` : ""}</span>
+      ${q.page ? `<span class="pg">p. ${esc(q.page)}</span>` : ""}
+      ${confirming
+        ? `<span class="confirm">Delete this quote? <button class="btn sm danger" data-act="delq-yes">Delete</button><button class="btn sm ghost" data-act="delq-no">Keep</button></span>`
+        : `<button class="btn sm ghost" data-act="copy">Copy</button><button class="btn sm ghost" data-act="editq">Edit</button><button class="btn sm ghost" data-act="delq">Delete</button>`}
+    </div>
+  </article>`;
+}
+
+function backupBanner() {
+  const n = state.quotes.length;
+  const stale = n >= 10 && Date.now() - (state.lastBackup || 0) > 30 * 864e5;
+  if (!stale) return "";
+  return `<div class="banner"><p>Your quotes are stored only on this phone. ${state.lastBackup ? "Your last backup was over a month ago." : "You haven't made a backup yet."}</p><button class="btn sm primary" data-act="export-json">Back up now</button></div>`;
+}
+
+function renderLibrary() {
+  const app = $("#app");
+  if (!state.books.length) {
+    app.innerHTML = `<div class="empty">
+      <h2>Your shelf is empty</h2>
+      <p>Add the book you're reading now, then save the lines worth keeping. Search by title or author, or type the details yourself.</p>
+      <button class="btn primary" data-act="addbook">+ Add your first book</button>
+      <button class="btn ghost sm" data-act="import">Restore from a backup</button>
+    </div>`;
+    return;
+  }
+  const f = state.filter.trim().toLowerCase();
+  let review = "";
+  if (state.quotes.length && !f) {
+    if (!reviewId || !state.quotes.some(q => q.id === reviewId)) reviewId = state.quotes[Math.floor(Math.random() * state.quotes.length)].id;
+    const q = state.quotes.find(x => x.id === reviewId); const b = bookOf(q.bookId) || {};
+    review = `<section class="review" aria-label="Highlight to revisit">
+      <span class="label">Revisit</span>
+      <blockquote>${esc(q.text)}</blockquote>
+      <div class="meta"><span>${esc(b.title || q.bookTitle)} · ${esc(b.author || q.author || "")}${q.page ? ` · p. ${esc(q.page)}` : ""}</span>
+        <button class="btn sm" data-act="shuffle">Show another</button>
+        <button class="btn sm ghost" data-act="open" data-id="${q.bookId}">Open book</button></div>
+    </section>`;
+  }
+  let body;
+  if (f) {
+    const books = state.books.filter(b => (b.title + " " + b.author).toLowerCase().includes(f));
+    const qs = state.quotes.filter(q => {
+      const b = bookOf(q.bookId) || {};
+      return [q.text, q.note, b.title, b.author].join(" ").toLowerCase().includes(f);
+    }).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    body = `
+      ${books.length ? `<div class="section-head"><h2>Books</h2><span class="label">${books.length}</span></div><div class="shelf">${books.map(shelfBook).join("")}</div>` : ""}
+      <div class="section-head"><h2>Quotes</h2><span class="label">${qs.length}</span></div>
+      ${qs.length ? `<div class="quotes">${qs.map(q => quoteCard(q, true)).join("")}</div>` : `<p class="hint" style="margin-top:12px">No quotes match “${esc(state.filter)}”.</p>`}`;
+  } else {
+    const books = [...state.books].sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+    body = `<div class="section-head"><h2>Library</h2><span class="label">${state.books.length} book${state.books.length === 1 ? "" : "s"} · ${state.quotes.length} quote${state.quotes.length === 1 ? "" : "s"}</span></div>
+      <div class="shelf">${books.map(shelfBook).join("")}</div>`;
+  }
+  const hadFocus = document.activeElement?.id === "filter";
+  const pos = hadFocus ? document.activeElement.selectionStart : 0;
+  app.innerHTML = `${backupBanner()}${review}
+    <div class="search"><input id="filter" type="search" placeholder="Search quotes, notes, books and authors" value="${esc(state.filter)}" aria-label="Search your library"></div>
+    ${body}`;
+  if (hadFocus) { const i = $("#filter"); i.focus(); i.setSelectionRange(pos, pos); }
+}
+function shelfBook(b) {
+  const n = state.quotes.filter(q => q.bookId === b.id).length;
+  return `<button class="book" data-act="open" data-id="${b.id}">${coverHTML(b)}<span class="count"><b>${n}</b> quote${n === 1 ? "" : "s"}</span></button>`;
+}
+
+function renderBook(id) {
+  const b = bookOf(id); const qs = quotesFor(id);
+  const confirming = state.confirmBook === id;
+  $("#app").innerHTML = `
+    <div style="margin-top:14px"><button class="btn ghost sm" data-act="back">← Library</button></div>
+    <section class="bookhead">
+      ${coverHTML(b, "cover", "L")}
+      <div style="min-width:0">
+        <h1>${esc(b.title)}</h1>
+        <div class="by">${esc(b.author || "Unknown author")}${b.year ? ` · ${esc(b.year)}` : ""}</div>
+        <div class="acts">
+          <button class="btn primary" data-act="addquote">+ Add quote</button>
+          ${confirming
+            ? `<span class="confirm">Delete this book and its ${qs.length} quote${qs.length === 1 ? "" : "s"}? <button class="btn sm danger" data-act="delbook-yes">Delete</button><button class="btn sm ghost" data-act="delbook-no">Keep</button></span>`
+            : `<button class="btn ghost" data-act="editbook">Edit</button><button class="btn ghost" data-act="delbook">Delete</button>`}
+        </div>
+      </div>
+    </section>
+    <div class="section-head"><h2>Quotes</h2><span class="label">${qs.length}</span></div>
+    ${qs.length ? `<div class="quotes">${qs.map(q => quoteCard(q, false)).join("")}</div>`
+      : `<div class="empty"><h2>No quotes yet</h2><p>Save a passage from ${esc(b.title)}. Page and note are optional.</p><button class="btn primary" data-act="addquote">+ Add a quote</button></div>`}`;
+}
+
+/* ---------- sheets ---------- */
+function openSheet(html, onMount) {
+  const root = $("#sheetRoot");
+  root.innerHTML = `<div class="scrim" data-act="close-scrim"><div class="sheet" role="dialog" aria-modal="true">${html}</div></div>`;
+  onMount?.(root.querySelector(".sheet"));
+}
+function closeSheet() { $("#sheetRoot").innerHTML = ""; }
+
+function addBookSheet(tab = "search", editId = null) {
+  const eb = editId ? bookOf(editId) : null;
+  openSheet(`
+    <div class="sheet-head"><h2>${eb ? "Edit book" : "Add a book"}</h2><button class="btn ghost sm" data-act="close">Close</button></div>
+    ${eb ? "" : `<div class="tabs" role="tablist">
+      <button role="tab" aria-selected="${tab === "search"}" data-act="tab" data-tab="search">Search</button>
+      <button role="tab" aria-selected="${tab === "manual"}" data-act="tab" data-tab="manual">Enter manually</button>
+    </div>`}
+    ${tab === "search" && !eb ? `
+      <form id="searchForm" class="field">
+        <label for="bq">Title or author</label>
+        <div style="display:flex;gap:8px"><input id="bq" type="search" autocomplete="off" enterkeyhint="search" placeholder="e.g. The Remains of the Day" style="flex:1;min-width:0"><button class="btn primary" type="submit">Search</button></div>
+        <p class="hint">Searches the Open Library catalogue.</p>
+      </form>
+      <div class="results" id="results"></div>`
+    : `
+      <form id="manualForm" style="display:grid;gap:14px">
+        <div class="field"><label for="mt">Title</label><input id="mt" value="${esc(eb?.title || "")}"></div>
+        <div class="row2">
+          <div class="field"><label for="ma">Author</label><input id="ma" value="${esc(eb?.author || "")}"></div>
+          <div class="field"><label for="my">Year <em>optional</em></label><input id="my" inputmode="numeric" value="${esc(eb?.year || "")}"></div>
+        </div>
+        <p class="err" id="merr" hidden></p>
+        <div class="sheet-foot"><button class="btn primary" type="submit">${eb ? "Save changes" : "Add book"}</button></div>
+      </form>`}
+  `, sh => { const i = sh.querySelector("input"); i && setTimeout(() => i.focus(), 30); });
+  if (tab === "search" && !eb) $("#searchForm").addEventListener("submit", e => { e.preventDefault(); $("#bq").blur(); runSearch($("#bq").value.trim()); });
+  else $("#manualForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const title = $("#mt").value.trim(), author = $("#ma").value.trim(), year = $("#my").value.trim();
+    if (!title || !author) { const m = $("#merr"); m.textContent = "Add a title and an author."; m.hidden = false; return; }
+    if (eb) {
+      put("books", { ...eb, title, author, year, updatedAt: Date.now() });
+      state.quotes.filter(q => q.bookId === eb.id).forEach(q => { q.bookTitle = title; q.author = author; });
+      save(); closeSheet(); render(); toast("Book updated");
+    } else addBook({ title, author, year });
+  });
+}
+
+let lastResults = [], searchCtl;
+async function runSearch(q) {
+  const out = $("#results"); if (!q) return;
+  if (!navigator.onLine) { out.innerHTML = `<p class="hint">You're offline. Search needs a connection, or use “Enter manually”.</p>`; return; }
+  searchCtl?.abort(); searchCtl = new AbortController();
+  out.innerHTML = `<p class="hint">Searching for “${esc(q)}”…</p>`;
+  try {
+    const url = `https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&fields=key,title,author_name,first_publish_year,cover_i&limit=12`;
+    const r = await fetch(url, { signal: searchCtl.signal });
+    if (!r.ok) throw new Error(r.status);
+    const data = await r.json();
+    lastResults = (data.docs || []).filter(d => d.title).slice(0, 12).map(d => ({
+      title: d.title, author: (d.author_name || []).slice(0, 2).join(", "), year: d.first_publish_year || "", coverId: d.cover_i || null, olKey: d.key || ""
+    }));
+    if (!$("#results")) return;
+    out.innerHTML = lastResults.length
+      ? lastResults.map((r, i) => `<button class="res" data-act="pick" data-i="${i}" type="button">
+          <span class="mini" style="background:${coverColor(r.title + r.author)}">${r.coverId ? `<img src="${coverUrl(r.coverId, "S")}" alt="" loading="lazy" onerror="this.remove()">` : ""}</span>
+          <span style="min-width:0"><span class="rt">${esc(r.title)}</span><br><span class="ra">${esc(r.author || "Unknown author")}${r.year ? ` · ${esc(r.year)}` : ""}</span></span>
+          <span class="btn sm">Add</span></button>`).join("")
+      : `<p class="hint">No matches. Try a different spelling, or enter the book manually.</p>`;
+  } catch (e) {
+    if (e?.name === "AbortError") return;
+    if ($("#results")) out.innerHTML = `<p class="hint">Search didn't work this time. Check your connection and try again, or enter the book manually.</p>`;
+  }
+}
+
+function addBook({ title, author, year, coverId, olKey }) {
+  const dup = state.books.find(b => b.title.toLowerCase() === title.toLowerCase() && (b.author || "").toLowerCase() === (author || "").toLowerCase());
+  if (dup) { closeSheet(); go({ name: "book", id: dup.id }); toast("Already on your shelf"); return; }
+  const now = Date.now();
+  const b = { id: uid("b_"), title, author: author || "", year: year ? String(year) : "", coverId: coverId || null, olKey: olKey || "", createdAt: now, updatedAt: now };
+  put("books", b); closeSheet(); go({ name: "book", id: b.id }); toast("Book added");
+}
+
+function quoteSheet(bookId, quoteId) {
+  const b = bookOf(bookId); const q = quoteId ? state.quotes.find(x => x.id === quoteId) : null;
+  openSheet(`
+    <div class="sheet-head"><h2>${q ? "Edit quote" : "Add quote"}</h2><button class="btn ghost sm" data-act="close">Close</button></div>
+    <div class="linked"><span class="label">Linked to</span><br><b>${esc(b.title)}</b> · ${esc(b.author || "Unknown author")}</div>
+    <form id="quoteForm" style="display:grid;gap:14px">
+      <div class="field"><label for="qt">Quote</label><textarea id="qt" class="big" placeholder="Type or paste the passage">${esc(q?.text || "")}</textarea></div>
+      <div class="field"><label for="qp">Page <em>optional</em></label><input id="qp" inputmode="numeric" value="${esc(q?.page || "")}" placeholder="e.g. 142" style="max-width:160px"></div>
+      <div class="field"><label for="qn">Note <em>optional</em></label><textarea id="qn" placeholder="Why it stood out, what it connects to">${esc(q?.note || "")}</textarea></div>
+      <p class="err" id="qerr" hidden></p>
+      <div class="sheet-foot">${q ? "" : `<button class="btn" type="submit" data-again="1">Save and add another</button>`}<button class="btn primary" type="submit">Save quote</button></div>
+    </form>`, sh => setTimeout(() => sh.querySelector("#qt").focus(), 30));
+  $("#quoteForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const again = e.submitter?.dataset.again === "1";
+    const text = $("#qt").value.trim();
+    if (!text) { const m = $("#qerr"); m.textContent = "Quote text is required."; m.hidden = false; $("#qt").focus(); return; }
+    const now = Date.now();
+    const obj = { ...(q || { id: uid("q_"), createdAt: now }), bookId, bookTitle: b.title, author: b.author || "",
+      text, page: $("#qp").value.trim(), note: $("#qn").value.trim(), updatedAt: now };
+    const bi = state.books.findIndex(x => x.id === bookId); if (bi >= 0) state.books[bi] = { ...b, updatedAt: now };
+    put("quotes", obj);
+    if (again) { quoteSheet(bookId); toast("Saved. Add the next one."); }
+    else { closeSheet(); toast(q ? "Quote updated" : "Quote saved"); }
+  });
+}
+
+/* ---------- backup ---------- */
+function settingsSheet() {
+  const last = state.lastBackup ? new Date(state.lastBackup).toLocaleDateString() : "never";
+  openSheet(`
+    <div class="sheet-head"><h2>Backup</h2><button class="btn ghost sm" data-act="close">Close</button></div>
+    <div class="setting">
+      <h3>Back up your library</h3>
+      <p>Your ${state.books.length} book${state.books.length === 1 ? "" : "s"} and ${state.quotes.length} quote${state.quotes.length === 1 ? "" : "s"} are stored only on this device. Save a backup file to iCloud, Google Drive or email it to yourself. Last backup: ${esc(last)}.</p>
+      <div class="btns"><button class="btn primary" data-act="export-json">Save backup file</button></div>
+    </div>
+    <div class="setting">
+      <h3>Restore from a backup</h3>
+      <p>Adds the books and quotes from a backup file. Anything already here is kept.</p>
+      <div class="btns"><button class="btn" data-act="import">Choose backup file</button></div>
+    </div>
+    <div class="setting">
+      <h3>Export as Markdown</h3>
+      <p>A readable file with every quote grouped by book, for Obsidian, Notion or notes apps.</p>
+      <div class="btns"><button class="btn" data-act="export-md">Export Markdown</button></div>
+    </div>`);
+}
+function exportJSON() {
+  state.lastBackup = Date.now(); save();
+  downloadFile(`quote-shelf-backup-${today()}.json`, JSON.stringify({ app: "quote-shelf", version: 1, exportedAt: new Date().toISOString(), books: state.books, quotes: state.quotes }, null, 2), "application/json");
+  toast("Backup saved"); render();
+}
+function exportMD() {
+  const books = [...state.books].sort((a, b) => a.title.localeCompare(b.title));
+  const md = books.map(b => {
+    const qs = quotesFor(b.id).reverse();
+    return `## ${b.title}\n*${b.author || "Unknown author"}${b.year ? `, ${b.year}` : ""}*\n\n` +
+      (qs.length ? qs.map(q => `> ${q.text.replace(/\n/g, "\n> ")}\n${q.page ? `\n— p. ${q.page}\n` : ""}${q.note ? `\n**Note:** ${q.note}\n` : ""}`).join("\n---\n\n") : "_No quotes yet._\n");
+  }).join("\n\n");
+  downloadFile(`quote-shelf-${today()}.md`, `# Quote Shelf\n\n${md}\n`, "text/markdown");
+  toast("Markdown exported");
+}
+$("#importFile").addEventListener("change", async e => {
+  const file = e.target.files[0]; e.target.value = ""; if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (!Array.isArray(data.books) || !Array.isArray(data.quotes)) throw new Error("shape");
+    let nb = 0, nq = 0;
+    for (const b of data.books) if (b?.id && b.title && !bookOf(b.id)) { state.books.push(b); nb++; }
+    for (const q of data.quotes) if (q?.id && q.text && q.bookId && !state.quotes.some(x => x.id === q.id)) { state.quotes.push(q); nq++; }
+    save(); closeSheet(); go({ name: "library" });
+    toast(nb || nq ? `Restored ${nb} book${nb === 1 ? "" : "s"} and ${nq} quote${nq === 1 ? "" : "s"}` : "Everything in that backup is already here");
+  } catch { toast("That file isn't a Quote Shelf backup."); }
+});
+
+/* ---------- events ---------- */
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-act]"); if (!t) return;
+  const act = t.dataset.act; const qid = t.closest("[data-q]")?.dataset.q;
+  switch (act) {
+    case "close-scrim": if (e.target === t) closeSheet(); break;
+    case "close": closeSheet(); break;
+    case "addbook": addBookSheet(); break;
+    case "tab": addBookSheet(t.dataset.tab); break;
+    case "pick": { const r = lastResults[+t.dataset.i]; if (r) addBook(r); break; }
+    case "open": state.filter = ""; go({ name: "book", id: t.dataset.id }); break;
+    case "back": go({ name: "library" }); break;
+    case "shuffle": { if (state.quotes.length > 1) { let n; do n = state.quotes[Math.floor(Math.random() * state.quotes.length)].id; while (n === reviewId); reviewId = n; } render(); break; }
+    case "addquote": quoteSheet(state.view.id); break;
+    case "editbook": addBookSheet("manual", state.view.id); break;
+    case "editq": { const q = state.quotes.find(x => x.id === qid); quoteSheet(q.bookId, qid); break; }
+    case "copy": { const q = state.quotes.find(x => x.id === qid); const b = bookOf(q.bookId) || {};
+      copy(`“${q.text}”\n— ${b.author || q.author}, ${b.title || q.bookTitle}${q.page ? `, p. ${q.page}` : ""}`); break; }
+    case "delq": state.confirmQuote = qid; render(); break;
+    case "delq-no": state.confirmQuote = null; render(); break;
+    case "delq-yes": state.confirmQuote = null; del("quotes", qid); toast("Quote deleted"); break;
+    case "delbook": state.confirmBook = state.view.id; render(); break;
+    case "delbook-no": state.confirmBook = null; render(); break;
+    case "delbook-yes": {
+      const id = state.view.id; state.confirmBook = null;
+      state.quotes = state.quotes.filter(q => q.bookId !== id); del("books", id); go({ name: "library" }); toast("Book deleted"); break;
+    }
+    case "export-json": exportJSON(); break;
+    case "export-md": exportMD(); break;
+    case "import": $("#importFile").click(); break;
+  }
+});
+document.addEventListener("input", e => { if (e.target.id === "filter") { state.filter = e.target.value; renderLibrary(); } });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && $("#sheetRoot").innerHTML) closeSheet(); });
+$("#home").addEventListener("click", () => { state.filter = ""; go({ name: "library" }); });
+$("#addBookTop").addEventListener("click", () => addBookSheet());
+$("#settingsBtn").addEventListener("click", settingsSheet);
+window.addEventListener("storage", e => { if (e.key === KEY) { load(); render(); } });
+
+load(); render();
+if ("serviceWorker" in navigator && location.protocol !== "file:") navigator.serviceWorker.register("sw.js").catch(() => {});
+})();
+</script>
+</body>
+</html>
