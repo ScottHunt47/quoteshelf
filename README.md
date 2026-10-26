@@ -34,6 +34,16 @@ That means:
 - **iPhone:** if you don't open the app for several weeks, Safari can clear its data. Opening it now and then, and keeping backups, protects you.
 - **Markdown export** gives a readable file of all your quotes grouped by book, for Obsidian, Notion or Apple Notes.
 
+## Scanning quotes
+When adding a quote, tap **Scan with camera** (or **Use a photo** for one you've already taken). Take a photo of the page, then tap each line you want. The lines join into one passage, with words split across lines rejoined, and drop into the quote box for you to check before saving.
+
+- Pick the book's language from the menu next to the scan buttons. The app remembers your choice.
+- Everything is read on your phone. Photos are never uploaded anywhere.
+- The first scan in each language downloads the text reader (around 5 to 15 MB), so do it on Wi-Fi.
+- For best results, hold the page flat, fill the frame with the text, and avoid shadows.
+- Always check the text before saving: scanning occasionally misreads a letter or punctuation mark.
+
+
 ## Updating the app
 
 If you change `index.html`, also change the `VERSION` line at the top of `sw.js` (for example `qs-v1` to `qs-v2`), then upload the folder again. Phones pick up the new version the next time the app opens with a connection.
