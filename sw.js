@@ -1,6 +1,6 @@
 // Quote Shelf service worker: makes the app open offline.
 // Bump VERSION whenever you change index.html so phones pick up the update.
-const VERSION = "qs-v2";
+const VERSION = "qs-v3";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png", "./icons/favicon.png"];
 
