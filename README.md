@@ -29,7 +29,7 @@ When adding a quote, tap **Scan with camera** (or **Use a photo** for one you've
 
 - Pick the book's language from the menu next to the scan buttons. The app remembers your choice.
 - Everything is read on your phone. Photos are never uploaded anywhere.
-- The first scan in each language downloads the text reader (around 5 to 15 MB), so do it on Wi-Fi.
+- The first scan in each language downloads the text reader (around 5 to 15 MB)
 - For best results, hold the page flat, fill the frame with the text, and avoid shadows.
 - Always check the text before saving: scanning occasionally misreads a letter or punctuation mark.
 
