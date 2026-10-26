@@ -32,6 +32,7 @@ That means:
 - **Moving to a new phone:** install the app there, then choose **Restore from a backup**.
 - **Deleting the app from your home screen deletes your quotes** on most phones. Back up first.
 - **iPhone:** if you don't open the app for several weeks, Safari can clear its data. Opening it now and then, and keeping backups, protects you.
+- **Import from Readwise:** on a computer, go to readwise.io/export and choose **Export to CSV**. Then in Quote Shelf tap the download icon, **Choose Readwise CSV**, and pick that file. Importing the same file again skips quotes you already have.
 - **Markdown export** gives a readable file of all your quotes grouped by book, for Obsidian, Notion or Apple Notes.
 
 ## Scanning quotes
