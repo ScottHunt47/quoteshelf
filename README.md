@@ -1,6 +1,6 @@
 # Quote Shelf
 
-A Readwise-style app for saving quotes from the books you read. It installs on your phone's home screen, works offline, and searches the Open Library catalogue for books and covers.
+An for saving quotes from the books you read. It installs on your phone's home screen, works offline, and searches the Open Library catalogue for books and covers.
 
 ## Put it online (free, about 5 minutes)
 
