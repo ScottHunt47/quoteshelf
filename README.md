@@ -43,6 +43,10 @@ When adding a quote, tap **Scan with camera** (or **Use a photo** for one you've
 - For best results, hold the page flat, fill the frame with the text, and avoid shadows.
 - Always check the text before saving: scanning occasionally misreads a letter or punctuation mark.
 
+## Sharing a quote as an image
+
+Tap **Share** on any quote. Choose a size (wide, square, portrait or story), a style (Cover, Clean or Classic) and a colour, then tap **Share image** to send it to WhatsApp, Instagram, Messages and so on, or **Save image** to keep it. **Share text** sends the quote as plain text. On iPhone, the easiest way to keep an image is **Share image**, then **Save Image**
+
 
 ## Updating the app
 
