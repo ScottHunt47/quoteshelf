@@ -197,6 +197,7 @@ img{max-width:100%}
 <div id="sheetRoot"></div>
 <div id="toastRoot"></div>
 <input type="file" id="importFile" accept="application/json,.json" hidden>
+<input type="file" id="csvFile" accept=".csv,text/csv,text/comma-separated-values" hidden>
 <input type="file" id="camFile" accept="image/*" capture="environment" hidden>
 <input type="file" id="picFile" accept="image/*" hidden>
 
@@ -291,7 +292,7 @@ function renderLibrary() {
       <h2>Your shelf is empty</h2>
       <p>Add the book you're reading now, then save the lines worth keeping. Search by title or author, or type the details yourself.</p>
       <button class="btn primary" data-act="addbook">+ Add your first book</button>
-      <button class="btn ghost sm" data-act="import">Restore from a backup</button>
+      <div class="opt-row"><button class="btn ghost sm" data-act="import">Restore from a backup</button><button class="btn ghost sm" data-act="import-csv">Import from Readwise</button></div>
     </div>`;
     return;
   }
@@ -853,7 +854,7 @@ async function shareText() {
 function settingsSheet() {
   const last = state.lastBackup ? new Date(state.lastBackup).toLocaleDateString() : "never";
   openSheet(`
-    <div class="sheet-head"><h2>Backup</h2><button class="btn ghost sm" data-act="close">Close</button></div>
+    <div class="sheet-head"><h2>Backup and import</h2><button class="btn ghost sm" data-act="close">Close</button></div>
     <div class="setting">
       <h3>Back up your library</h3>
       <p>Your ${state.books.length} book${state.books.length === 1 ? "" : "s"} and ${state.quotes.length} quote${state.quotes.length === 1 ? "" : "s"} are stored only on this device. Save a backup file to iCloud, Google Drive or email it to yourself. Last backup: ${esc(last)}.</p>
@@ -863,6 +864,11 @@ function settingsSheet() {
       <h3>Restore from a backup</h3>
       <p>Adds the books and quotes from a backup file. Anything already here is kept.</p>
       <div class="btns"><button class="btn" data-act="import">Choose backup file</button></div>
+    </div>
+    <div class="setting">
+      <h3>Import from Readwise</h3>
+      <p>On a computer, go to readwise.io/export and choose <b>Export to CSV</b>. Then choose that file here. Your quotes are grouped into books, and anything already imported is skipped.</p>
+      <div class="btns"><button class="btn" data-act="import-csv">Choose Readwise CSV</button></div>
     </div>
     <div class="setting">
       <h3>Export as Markdown</h3>
@@ -896,6 +902,86 @@ $("#importFile").addEventListener("change", async e => {
     save(); closeSheet(); go({ name: "library" });
     toast(nb || nq ? `Restored ${nb} book${nb === 1 ? "" : "s"} and ${nq} quote${nq === 1 ? "" : "s"}` : "Everything in that backup is already here");
   } catch { toast("That file isn't a Quote Shelf backup."); }
+});
+
+/* ---------- import from Readwise (CSV export) ---------- */
+function parseCSV(text) {
+  const rows = []; let row = [], field = "", i = 0, q = false;
+  text = text.replace(/^﻿/, "");
+  while (i < text.length) {
+    const c = text[i];
+    if (q) {
+      if (c === '"') { if (text[i + 1] === '"') { field += '"'; i += 2; continue; } q = false; i++; continue; }
+      field += c; i++; continue;
+    }
+    if (c === '"') { q = true; i++; continue; }
+    if (c === ",") { row.push(field); field = ""; i++; continue; }
+    if (c === "\r") { i++; continue; }
+    if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; i++; continue; }
+    field += c; i++;
+  }
+  if (field || row.length) { row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(v => v.trim()));
+}
+function importReadwise(text) {
+  const rows = parseCSV(text);
+  if (rows.length < 2) throw new Error("empty");
+  const head = rows[0].map(h => h.trim().toLowerCase());
+  const col = (...names) => { for (const n of names) { const i = head.indexOf(n); if (i >= 0) return i; } return -1; };
+  const iText = col("highlight", "text", "quote"), iTitle = col("book title", "title"), iAuthor = col("book author", "author");
+  const iNote = col("note", "notes"), iLoc = col("location"), iLocType = col("location type"), iDate = col("highlighted at", "date");
+  if (iText < 0 || iTitle < 0) throw new Error("shape");
+  const key = (t, a) => (t || "").trim().toLowerCase() + "|" + (a || "").trim().toLowerCase();
+  const byKey = new Map(state.books.map(b => [key(b.title, b.author), b]));
+  const seen = new Set(state.quotes.map(q => q.bookId + "|" + q.text.trim()));
+  let nb = 0, nq = 0; const newBooks = [];
+  const now = Date.now();
+  rows.slice(1).forEach((r, idx) => {
+    const quoteText = (r[iText] || "").trim(); if (!quoteText) return;
+    const title = (r[iTitle] || "").trim() || "Untitled";
+    const author = iAuthor >= 0 ? (r[iAuthor] || "").trim() : "";
+    let book = byKey.get(key(title, author));
+    if (!book) {
+      book = { id: uid("b_"), title, author, year: "", coverId: null, olKey: "", createdAt: now, updatedAt: now };
+      state.books.push(book); byKey.set(key(title, author), book); newBooks.push(book); nb++;
+    }
+    const sig = book.id + "|" + quoteText;
+    if (seen.has(sig)) return; seen.add(sig);
+    const loc = iLoc >= 0 ? (r[iLoc] || "").trim() : "";
+    const locType = iLocType >= 0 ? (r[iLocType] || "").trim().toLowerCase() : "";
+    const page = !loc ? "" : locType === "page" || !locType ? loc : locType === "location" ? "loc. " + loc : "";
+    const d = iDate >= 0 ? Date.parse(r[iDate]) : NaN;
+    const created = isNaN(d) ? now - idx : d;
+    state.quotes.push({ id: uid("q_"), bookId: book.id, bookTitle: book.title, author: book.author, text: quoteText,
+      page, note: iNote >= 0 ? (r[iNote] || "").trim() : "", createdAt: created, updatedAt: created });
+    book.updatedAt = Math.max(book.updatedAt || 0, created);
+    nq++;
+  });
+  return { nb, nq, newBooks };
+}
+// Look up covers for imported books in the background, one at a time.
+async function findCovers(books) {
+  for (const b of books) {
+    if (!navigator.onLine) return;
+    try {
+      const r = await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(b.title)}${b.author ? `&author=${encodeURIComponent(b.author)}` : ""}&fields=key,cover_i,first_publish_year&limit=1`);
+      const d = (await r.json()).docs?.[0];
+      const cur = bookOf(b.id);
+      if (d && cur) { cur.coverId = d.cover_i || null; cur.olKey = d.key || ""; if (!cur.year && d.first_publish_year) cur.year = String(d.first_publish_year); save(); render(); }
+    } catch {}
+    await new Promise(res => setTimeout(res, 400));
+  }
+}
+$("#csvFile").addEventListener("change", async e => {
+  const file = e.target.files[0]; e.target.value = ""; if (!file) return;
+  try {
+    const { nb, nq, newBooks } = importReadwise(await file.text());
+    save(); closeSheet(); go({ name: "library" });
+    toast(nq ? `Imported ${nq} quote${nq === 1 ? "" : "s"}${nb ? ` from ${nb} new book${nb === 1 ? "" : "s"}` : ""}` : "Everything in that file is already here");
+    if (newBooks.length) findCovers(newBooks);
+  } catch (err) {
+    toast(err.message === "shape" ? "That file doesn't look like a Readwise CSV export." : "Couldn't read that file. Check it's the CSV from readwise.io/export.");
+  }
 });
 
 /* ---------- events ---------- */
@@ -944,6 +1030,7 @@ document.addEventListener("click", e => {
     case "export-json": exportJSON(); break;
     case "export-md": exportMD(); break;
     case "import": $("#importFile").click(); break;
+    case "import-csv": $("#csvFile").click(); break;
   }
 });
 document.addEventListener("input", e => { if (e.target.id === "filter") { state.filter = e.target.value; renderLibrary(); } });
