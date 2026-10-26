@@ -2,17 +2,6 @@
 
 An app for saving quotes from the books you read. It installs on your phone's home screen, works offline, and searches the Open Library catalogue for books and covers.
 
-## Put it online (free, about 5 minutes)
-
-The app has to be on the web once so your phone can install it. The easiest way:
-
-1. Unzip `quote-shelf.zip` on your computer. You'll get a folder called `quote-shelf`.
-2. Go to **app.netlify.com/drop** and create a free account.
-3. Drag the `quote-shelf` folder onto the page.
-4. Netlify gives you a web address like `something-random.netlify.app`. You can rename it in **Site settings → Change site name**, for example `scott-quotes.netlify.app`.
-
-GitHub Pages and Cloudflare Pages work too. Upload the folder's contents, with `index.html` at the top level.
-
 ## Install it on your phone
 
 Open your web address on your phone, then:
