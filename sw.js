@@ -1,6 +1,6 @@
 // Quote Shelf service worker: makes the app open offline.
 // Bump VERSION whenever you change index.html so phones pick up the update.
-const VERSION = "qs-v1";
+const VERSION = "qs-v2";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest",
   "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png", "./icons/favicon.png"];
 
@@ -30,8 +30,9 @@ self.addEventListener("fetch", e => {
     return;
   }
 
-  // Covers and fonts: serve from cache, refresh in the background.
-  if (url.hostname === "covers.openlibrary.org" || url.hostname.endsWith("fonts.googleapis.com") || url.hostname.endsWith("fonts.gstatic.com")) {
+  // Covers, fonts and the text reader: serve from cache, refresh in the background.
+  if (url.hostname === "covers.openlibrary.org" || url.hostname.endsWith("fonts.googleapis.com") || url.hostname.endsWith("fonts.gstatic.com") ||
+      url.hostname === "cdn.jsdelivr.net" || url.hostname === "tessdata.projectnaptha.com") {
     e.respondWith(caches.open("qs-runtime").then(async c => {
       const hit = await c.match(req);
       const net = fetch(req).then(r => { if (r.ok || r.type === "opaque") c.put(req, r.clone()); return r; }).catch(() => hit);
