@@ -152,6 +152,19 @@ img{max-width:100%}
 .banner{margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:.9rem}
 .banner p{margin:0;flex:1;min-width:200px}
 @media (max-width:420px){#addBookTop .long{display:none}}
+/* scanner */
+.scanbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.scanbar select{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 10px;font-size:.82rem}
+.scan-img{position:relative;border-radius:8px;overflow:hidden;line-height:0;background:var(--line);user-select:none;-webkit-user-select:none}
+.scan-img img{width:100%;display:block}
+.scan-img.busy img{opacity:.45}
+.ln{position:absolute;border:0;padding:0;margin:0;border-radius:3px;background:rgba(31,95,116,.16);box-shadow:0 0 0 1px rgba(31,95,116,.55);cursor:pointer}
+.ln.on{background:rgba(255,222,40,.75);mix-blend-mode:multiply;box-shadow:0 0 0 1.5px #b08d00}
+.prog{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.prog i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.picked{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-family:var(--serif);font-size:.98rem;max-height:9em;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
+.picked:empty::before{content:"Tap lines on the photo to pick them.";color:var(--muted);font-family:var(--sans);font-size:.88rem}
+.scan-foot{position:sticky;bottom:calc(-24px - env(safe-area-inset-bottom,0px));background:var(--bg);padding-block:10px calc(10px + env(safe-area-inset-bottom,0px));margin-bottom:calc(-24px - env(safe-area-inset-bottom,0px));display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;border-top:1px solid var(--line)}
 </style>
 </head>
 <body>
@@ -169,6 +182,8 @@ img{max-width:100%}
 <div id="sheetRoot"></div>
 <div id="toastRoot"></div>
 <input type="file" id="importFile" accept="application/json,.json" hidden>
+<input type="file" id="camFile" accept="image/*" capture="environment" hidden>
+<input type="file" id="picFile" accept="image/*" hidden>
 
 <script>
 (() => {
@@ -335,7 +350,7 @@ function openSheet(html, onMount) {
   root.innerHTML = `<div class="scrim" data-act="close-scrim"><div class="sheet" role="dialog" aria-modal="true">${html}</div></div>`;
   onMount?.(root.querySelector(".sheet"));
 }
-function closeSheet() { $("#sheetRoot").innerHTML = ""; }
+function closeSheet() { $("#sheetRoot").innerHTML = ""; scan = null; }
 
 function addBookSheet(tab = "search", editId = null) {
   const eb = editId ? bookOf(editId) : null;
@@ -411,18 +426,28 @@ function addBook({ title, author, year, coverId, olKey }) {
   put("books", b); closeSheet(); go({ name: "book", id: b.id }); toast("Book added");
 }
 
-function quoteSheet(bookId, quoteId) {
+function quoteSheet(bookId, quoteId, draft) {
   const b = bookOf(bookId); const q = quoteId ? state.quotes.find(x => x.id === quoteId) : null;
+  const v = { text: q?.text || "", page: q?.page || "", note: q?.note || "", ...(draft || {}) };
+  const lang = ocrLangPref();
   openSheet(`
     <div class="sheet-head"><h2>${q ? "Edit quote" : "Add quote"}</h2><button class="btn ghost sm" data-act="close">Close</button></div>
     <div class="linked"><span class="label">Linked to</span><br><b>${esc(b.title)}</b> · ${esc(b.author || "Unknown author")}</div>
     <form id="quoteForm" style="display:grid;gap:14px">
-      <div class="field"><label for="qt">Quote</label><textarea id="qt" class="big" placeholder="Type or paste the passage">${esc(q?.text || "")}</textarea></div>
-      <div class="field"><label for="qp">Page <em>optional</em></label><input id="qp" inputmode="numeric" value="${esc(q?.page || "")}" placeholder="e.g. 142" style="max-width:160px"></div>
-      <div class="field"><label for="qn">Note <em>optional</em></label><textarea id="qn" placeholder="Why it stood out, what it connects to">${esc(q?.note || "")}</textarea></div>
+      <div class="field"><label for="qt">Quote</label>
+        <div class="scanbar">
+          <button class="btn sm" type="button" data-act="scan-cam">Scan with camera</button>
+          <button class="btn sm ghost" type="button" data-act="scan-pic">Use a photo</button>
+          <select id="ocrLang" aria-label="Language of the book">${OCR_LANGS.map(([c, n]) => `<option value="${c}"${c === lang ? " selected" : ""}>${n}</option>`).join("")}</select>
+        </div>
+        <textarea id="qt" class="big" placeholder="Type, paste or scan the passage">${esc(v.text)}</textarea></div>
+      <div class="field"><label for="qp">Page <em>optional</em></label><input id="qp" inputmode="numeric" value="${esc(v.page)}" placeholder="e.g. 142" style="max-width:160px"></div>
+      <div class="field"><label for="qn">Note <em>optional</em></label><textarea id="qn" placeholder="Why it stood out, what it connects to">${esc(v.note)}</textarea></div>
       <p class="err" id="qerr" hidden></p>
       <div class="sheet-foot">${q ? "" : `<button class="btn" type="submit" data-again="1">Save and add another</button>`}<button class="btn primary" type="submit">Save quote</button></div>
-    </form>`, sh => setTimeout(() => sh.querySelector("#qt").focus(), 30));
+    </form>`, sh => { if (matchMedia("(pointer:fine)").matches) setTimeout(() => sh.querySelector("#qt").focus(), 30); });
+  scanCtx = { bookId, quoteId };
+  $("#ocrLang").addEventListener("change", e => { try { localStorage.setItem("qs-ocr-lang", e.target.value); } catch {} });
   $("#quoteForm").addEventListener("submit", e => {
     e.preventDefault();
     const again = e.submitter?.dataset.again === "1";
@@ -436,6 +461,127 @@ function quoteSheet(bookId, quoteId) {
     if (again) { quoteSheet(bookId); toast("Saved. Add the next one."); }
     else { closeSheet(); toast(q ? "Quote updated" : "Quote saved"); }
   });
+}
+
+/* ---------- scanner: reads text from a photo, on the phone ---------- */
+const OCR_LANGS = [["eng","English"],["fra","French"],["spa","Spanish"],["deu","German"],["ita","Italian"],["por","Portuguese"]];
+const TESSERACT_URL = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
+function ocrLangPref() { try { return localStorage.getItem("qs-ocr-lang") || "eng"; } catch { return "eng"; } }
+let scanCtx = null, scan = null, ocrWorker = null, ocrWorkerLang = "", ocrProgress = () => {};
+
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    if (window.Tesseract) return res();
+    const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s);
+  });
+}
+async function getWorker(lang) {
+  if (ocrWorker && ocrWorkerLang === lang) return ocrWorker;
+  await loadScript(TESSERACT_URL);
+  if (ocrWorker) { try { await ocrWorker.terminate(); } catch {} ocrWorker = null; }
+  ocrWorker = await Tesseract.createWorker(lang, 1, { logger: m => ocrProgress(m) });
+  ocrWorkerLang = lang;
+  return ocrWorker;
+}
+function readDraft() {
+  return { text: $("#qt")?.value || "", page: $("#qp")?.value || "", note: $("#qn")?.value || "" };
+}
+function startScan(useCamera) {
+  scanCtx.draft = readDraft();
+  scanCtx.lang = $("#ocrLang")?.value || ocrLangPref();
+  $(useCamera ? "#camFile" : "#picFile").click();
+}
+for (const id of ["#camFile", "#picFile"]) $(id).addEventListener("change", e => {
+  const f = e.target.files[0]; e.target.value = ""; if (f && scanCtx) runScan(f);
+});
+
+async function prepareImage(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+    const scale = Math.min(1, 2400 / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.naturalWidth * scale); c.height = Math.round(img.naturalHeight * scale);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    return c;
+  } finally { URL.revokeObjectURL(url); }
+}
+
+async function runScan(file) {
+  const sc = scan = { lines: [], picked: new Set(), w: 1, h: 1, src: "", busy: true, status: "Preparing the photo…", pct: 0, error: "" };
+  renderScan();
+  try {
+    const canvas = await prepareImage(file);
+    sc.w = canvas.width; sc.h = canvas.height; sc.src = canvas.toDataURL("image/jpeg", 0.85);
+    sc.status = "Getting the text reader ready…"; renderScan();
+    ocrProgress = m => {
+      if (scan !== sc) return;
+      const s = m.status || "";
+      if (s.includes("traineddata")) sc.status = "Downloading the language pack (first time only)…";
+      else if (s.includes("recognizing")) sc.status = "Reading the page…";
+      else if (s.includes("core") || s.includes("api")) sc.status = "Getting the text reader ready…";
+      if (typeof m.progress === "number") sc.pct = s.includes("recognizing") ? m.progress : Math.min(m.progress, 1) * 0.3;
+      if (scan === sc) updateScanProgress();
+    };
+    if (scan !== sc) return;
+    const worker = await getWorker(scanCtx.lang);
+    const { data } = await worker.recognize(canvas);
+    if (scan !== sc) return;
+    sc.lines = (data.lines || []).map(l => ({ text: l.text.replace(/\s+/g, " ").trim(), b: l.bbox })).filter(l => l.text.length > 1);
+    sc.busy = false;
+    if (!sc.lines.length) sc.error = "No text found. Try again with the page flat, well lit and filling the frame.";
+  } catch (err) {
+    console.warn(err);
+    sc.busy = false;
+    sc.error = navigator.onLine
+      ? "The scan didn't work. Try another photo, or type the quote instead."
+      : "The first scan needs an internet connection to download the text reader. After that, scanning works offline.";
+  }
+  if (scan === sc) renderScan();
+}
+
+function joinLines(lines) {
+  return lines.reduce((acc, t) => {
+    if (!acc) return t;
+    if (/[A-Za-zÀ-ÿ]-$/.test(acc) && /^[a-zà-ÿ]/.test(t)) return acc.slice(0, -1) + t;
+    return acc + " " + t;
+  }, "").replace(/\s+([,.;:!?])/g, "$1").trim();
+}
+const pickedText = () => joinLines([...scan.picked].sort((a, b) => a - b).map(i => scan.lines[i].text));
+
+function renderScan() {
+  if (!scan) return;
+  const pct = v => (v * 100).toFixed(3) + "%";
+  const boxes = scan.busy ? "" : scan.lines.map((l, i) => {
+    const pad = 3;
+    const x = Math.max(0, l.b.x0 - pad), y = Math.max(0, l.b.y0 - pad);
+    return `<button type="button" class="ln${scan.picked.has(i) ? " on" : ""}" data-act="scan-line" data-i="${i}" aria-label="${esc(l.text)}" aria-pressed="${scan.picked.has(i)}"
+      style="left:${pct(x / scan.w)};top:${pct(y / scan.h)};width:${pct((l.b.x1 - l.b.x0 + pad * 2) / scan.w)};height:${pct((l.b.y1 - l.b.y0 + pad * 2) / scan.h)}"></button>`;
+  }).join("");
+  openSheet(`
+    <div class="sheet-head"><h2>Pick the lines</h2><button class="btn ghost sm" data-act="scan-back">Cancel</button></div>
+    ${scan.busy ? `<div style="display:grid;gap:8px"><p class="hint" id="scanStatus">${esc(scan.status)}</p><div class="prog"><i id="scanBar" style="width:${Math.round(scan.pct * 100)}%"></i></div></div>`
+      : scan.error ? `<p class="err">${esc(scan.error)}</p>`
+      : `<p class="hint">Tap each line you want in the quote. Tap again to remove it.</p>`}
+    ${scan.src ? `<div class="scan-img${scan.busy ? " busy" : ""}"><img src="${scan.src}" alt="Your photo of the page">${boxes}</div>` : ""}
+    ${!scan.busy && !scan.error ? `<div class="field"><span class="label">Your quote</span><div class="picked" id="picked">${esc(pickedText())}</div></div>` : ""}
+    <div class="scan-foot">
+      ${scan.busy ? "" : `<button class="btn sm ghost" data-act="scan-retake">New photo</button>`}
+      ${!scan.busy && !scan.error ? `<button class="btn sm ghost" data-act="scan-all">${scan.picked.size === scan.lines.length ? "Clear" : "Select all"}</button>
+        <button class="btn primary" data-act="scan-use" ${scan.picked.size ? "" : "disabled"}>Use ${scan.picked.size || ""} line${scan.picked.size === 1 ? "" : "s"}</button>` : ""}
+    </div>`);
+}
+function updateScanProgress() {
+  const s = $("#scanStatus"), bar = $("#scanBar");
+  if (s) s.textContent = scan.status;
+  if (bar) bar.style.width = Math.round(scan.pct * 100) + "%";
+}
+function backToQuote(extraText) {
+  const { bookId, quoteId, draft = {} } = scanCtx; scan = null;
+  const d = { ...draft };
+  if (extraText) d.text = d.text.trim() ? d.text.trim() + "\n\n" + extraText : extraText;
+  quoteSheet(bookId, quoteId, d);
+  if (extraText) toast("Check the text, then save");
 }
 
 /* ---------- backup ---------- */
@@ -501,6 +647,15 @@ document.addEventListener("click", e => {
     case "back": go({ name: "library" }); break;
     case "shuffle": { if (state.quotes.length > 1) { let n; do n = state.quotes[Math.floor(Math.random() * state.quotes.length)].id; while (n === reviewId); reviewId = n; } render(); break; }
     case "addquote": quoteSheet(state.view.id); break;
+    case "scan-cam": startScan(true); break;
+    case "scan-pic": startScan(false); break;
+    case "scan-line": { const i = +t.dataset.i; scan.picked.has(i) ? scan.picked.delete(i) : scan.picked.add(i);
+      const y = $(".sheet").scrollTop; renderScan(); $(".sheet").scrollTop = y; break; }
+    case "scan-all": { scan.picked = scan.picked.size === scan.lines.length ? new Set() : new Set(scan.lines.map((_, i) => i));
+      const y = $(".sheet").scrollTop; renderScan(); $(".sheet").scrollTop = y; break; }
+    case "scan-use": backToQuote(pickedText()); break;
+    case "scan-back": backToQuote(""); break;
+    case "scan-retake": $("#camFile").click(); break;
     case "editbook": addBookSheet("manual", state.view.id); break;
     case "editq": { const q = state.quotes.find(x => x.id === qid); quoteSheet(q.bookId, qid); break; }
     case "copy": { const q = state.quotes.find(x => x.id === qid); const b = bookOf(q.bookId) || {};
